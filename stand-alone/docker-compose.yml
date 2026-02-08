@@ -1,0 +1,11 @@
+version: '3'
+
+services:
+  helpa-standalone:
+    build: .
+    restart: always
+    ports:
+      - "3020:3020"
+    volumes:
+      - ./public/uploads:/app/public/uploads
+      - ./helpa.db:/app/helpa.db

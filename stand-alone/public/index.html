@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Helpa - Standalone</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+    </style>
+</head>
+
+<body class="bg-gray-100 min-h-screen">
+
+    <!-- Auth -->
+    <div id="auth-screen" class="min-h-screen flex items-center justify-center p-4">
+        <div class="bg-white p-6 rounded-lg shadow-md w-full max-w-sm">
+            <h1 class="text-2xl font-bold mb-6 text-center text-blue-600">Helpa (Standalone)</h1>
+
+            <div id="login-form">
+                <input type="email" id="l-email" placeholder="Email" class="w-full mb-3 p-2 border rounded">
+                <input type="password" id="l-pass" placeholder="Password" class="w-full mb-4 p-2 border rounded">
+                <button onclick="app.login()"
+                    class="w-full bg-blue-600 text-white p-2 rounded hover:bg-blue-700">Login</button>
+                <p class="text-center mt-4 text-sm text-blue-500 cursor-pointer" onclick="app.toggleAuth()">Need an
+                    account? Register</p>
+            </div>
+
+            <div id="register-form" class="hidden">
+                <input type="text" id="r-name" placeholder="Name" class="w-full mb-3 p-2 border rounded">
+                <input type="email" id="r-email" placeholder="Email" class="w-full mb-3 p-2 border rounded">
+                <input type="password" id="r-pass" placeholder="Password" class="w-full mb-4 p-2 border rounded">
+                <button onclick="app.register()"
+                    class="w-full bg-green-600 text-white p-2 rounded hover:bg-green-700">Register</button>
+                <p class="text-center mt-4 text-sm text-blue-500 cursor-pointer" onclick="app.toggleAuth()">Have an
+                    account? Login</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- App -->
+    <div id="app-screen" class="hidden">
+        <nav class="bg-white shadow p-4 sticky top-0 z-50">
+            <div class="container mx-auto flex justify-between items-center">
+                <div class="font-bold text-blue-600">Helpa</div>
+                <div class="space-x-4 text-sm">
+                    <button onclick="app.setView('feed')">Requests</button>
+                    <button onclick="app.setView('create')">+ New</button>
+                    <button onclick="app.logout()" class="text-red-500">Logout</button>
+                </div>
+            </div>
+        </nav>
+
+        <div class="container mx-auto p-4 max-w-2xl">
+            <!-- Feed -->
+            <div id="view-feed">
+                <h2 class="text-2xl font-bold mb-4">Requests</h2>
+                <div id="requests-list" class="space-y-4"></div>
+            </div>
+
+            <!-- Create -->
+            <div id="view-create" class="hidden">
+                <h2 class="text-2xl font-bold mb-4">Post Request</h2>
+                <div class="bg-white p-4 rounded shadow space-y-4">
+                    <input id="t-title" type="text" placeholder="Title" class="w-full p-2 border rounded">
+                    <textarea id="t-desc" placeholder="Description" class="w-full p-2 border rounded h-24"></textarea>
+                    <input id="t-price" type="number" placeholder="Price" class="w-full p-2 border rounded">
+                    <input id="t-file" type="file" class="w-full text-sm">
+                    <button onclick="app.createRequest()"
+                        class="w-full bg-blue-600 text-white p-2 rounded">Post</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const app = {
+            token: localStorage.getItem('token'),
+            user: JSON.parse(localStorage.getItem('user')),
+
+            init() {
+                if (this.token) this.showApp();
+                else document.getElementById('auth-screen').classList.remove('hidden');
+            },
+
+            toggleAuth() {
+                document.getElementById('login-form').classList.toggle('hidden');
+                document.getElementById('register-form').classList.toggle('hidden');
+            },
+
+            async login() {
+                const email = document.getElementById('l-email').value;
+                const password = document.getElementById('l-pass').value;
+                const res = await fetch('/api/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, password })
+                });
+                const data = await res.json();
+                if (res.ok) {
+                    this.token = data.token;
+                    this.user = data.user;
+                    localStorage.setItem('token', this.token);
+                    localStorage.setItem('user', JSON.stringify(this.user));
+                    this.showApp();
+                } else alert(data.error);
+            },
+
+            async register() {
+                const name = document.getElementById('r-name').value;
+                const email = document.getElementById('r-email').value;
+                const password = document.getElementById('r-pass').value;
+                const res = await fetch('/api/register', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name, email, password })
+                });
+                if (res.ok) {
+                    alert('Registered! Please login.');
+                    this.toggleAuth();
+                } else alert('Registration failed');
+            },
+
+            logout() {
+                localStorage.clear();
+                location.reload();
+            },
+
+            showApp() {
+                document.getElementById('auth-screen').classList.add('hidden');
+                document.getElementById('app-screen').classList.remove('hidden');
+                this.loadFeed();
+            },
+
+            setView(id) {
+                ['feed', 'create'].forEach(v => document.getElementById(`view-${v}`).classList.add('hidden'));
+                document.getElementById(`view-${id}`).classList.remove('hidden');
+            },
+
+            async loadFeed() {
+                const res = await fetch('/api/requests');
+                const list = await res.json();
+                const container = document.getElementById('requests-list');
+                container.innerHTML = list.map(req => `
+                    <div class="bg-white p-4 rounded shadow">
+                        <div class="flex justify-between">
+                            <h3 class="font-bold">${req.title}</h3>
+                            <span class="text-green-600 font-bold">${req.price}€</span>
+                        </div>
+                        <p class="text-gray-600 text-sm mt-1">${req.description}</p>
+                        ${req.image ? `<img src="${req.image}" class="mt-2 h-40 object-cover rounded">` : ''}
+                        <div class="text-xs text-gray-400 mt-2">By ${req.userName}</div>
+                    </div>
+                `).join('');
+                this.setView('feed');
+            },
+
+            async createRequest() {
+                const formData = new FormData();
+                formData.append('title', document.getElementById('t-title').value);
+                formData.append('description', document.getElementById('t-desc').value);
+                formData.append('price', document.getElementById('t-price').value);
+                const file = document.getElementById('t-file').files[0];
+                if (file) formData.append('image', file);
+
+                const res = await fetch('/api/requests', {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${this.token}` },
+                    body: formData
+                });
+
+                if (res.ok) {
+                    document.getElementById('t-title').value = '';
+                    document.getElementById('t-desc').value = '';
+                    document.getElementById('t-price').value = '';
+                    document.getElementById('t-file').value = '';
+                    this.loadFeed();
+                } else alert('Failed to post');
+            }
+        };
+        app.init();
+    </script>
+</body>
+
+</html>
