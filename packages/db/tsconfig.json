@@ -1,0 +1,15 @@
+{
+    "extends": "../../tsconfig.json",
+    "compilerOptions": {
+        "baseUrl": ".",
+        "paths": {
+            "@helpa/db": [
+                "./index"
+            ]
+        }
+    },
+    "include": [
+        "prisma/**/*",
+        "index.ts"
+    ]
+}

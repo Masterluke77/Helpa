@@ -1,0 +1,192 @@
+generator client {
+  provider = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+  extensions = [postgis]
+}
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String?   @unique
+  emailVerified DateTime?
+  image         String?
+  bio           String?
+  rating        Float     @default(0)
+  
+  // Geolocation (as simple lat/lng for now to sync with PostGIS raw queries)
+  // We can use raw queries to update/select strictly typed Geography logic
+  latitude      Float?
+  longitude     Float?
+
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  accounts      Account[]
+  sessions      Session[]
+  requests      Request[]
+  offers        Offer[]
+  messages      Message[]
+  reportsFiled  Report[]  @relation("Reporter")
+  reportsReceived Report[] @relation("ReportedUser")
+  
+  role          Role      @default(USER)
+}
+
+enum Role {
+  USER
+  ADMIN
+  MODERATOR
+}
+
+model Account {
+  id                 String  @id @default(cuid())
+  userId             String
+  type               String
+  provider           String
+  providerAccountId  String
+  refresh_token      String?  @db.Text
+  access_token       String?  @db.Text
+  expires_at         Int?
+  token_type         String?
+  scope              String?
+  id_token           String?  @db.Text
+  session_state      String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+model Request {
+  id          String   @id @default(cuid())
+  title       String
+  description String
+  category    String
+  price       Float?   // Optional suggested price
+  images      String[]
+  
+  // Location
+  latitude    Float
+  longitude   Float
+  radius      Int      // Radius in meters
+
+  status      RequestStatus @default(OPEN)
+  expiresAt   DateTime?
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  offers      Offer[]
+  chats       Chat[]
+}
+
+enum RequestStatus {
+  OPEN
+  NEGOTIATING
+  RESERVED
+  CLOSED
+  EXPIRED
+}
+
+model Offer {
+  id          String   @id @default(cuid())
+  price       Float
+  message     String?
+  status      OfferStatus @default(PENDING)
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  requestId   String
+  request     Request  @relation(fields: [requestId], references: [id], onDelete: Cascade)
+
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+enum OfferStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+}
+
+model Chat {
+  id          String   @id @default(cuid())
+  
+  requestId   String
+  request     Request  @relation(fields: [requestId], references: [id], onDelete: Cascade)
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  messages    Message[]
+  // For simplicity, we can rely on request.userId and offer.userId (if we link offer)
+  // But a cleaner way is tracking participants explicitly or implicitly via Request+Offer context? 
+  // Requirement says: "1:1 Chat between request creator and offerer"
+  // So we should probably link the specific Offer to the chat, or just the participants.
+  // Linking participants is flexible.
+  
+  participants String[] // Array of userIDs
+}
+
+model Message {
+  id        String   @id @default(cuid())
+  content   String?
+  imageUrl  String?
+  readAt    DateTime?
+
+  chatId    String
+  chat      Chat     @relation(fields: [chatId], references: [id], onDelete: Cascade)
+
+  senderId  String
+  sender    User     @relation(fields: [senderId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+}
+
+model Report {
+  id          String   @id @default(cuid())
+  reason      String
+  details     String?
+  status      ReportStatus @default(OPEN)
+
+  reporterId  String
+  reporter    User     @relation("Reporter", fields: [reporterId], references: [id])
+
+  // Can report a user or a specific content. 
+  // For now, let's just support reporting a user.
+  targetUserId String?
+  targetUser   User?    @relation("ReportedUser", fields: [targetUserId], references: [id])
+
+  createdAt   DateTime @default(now())
+}
+
+enum ReportStatus {
+  OPEN
+  RESOLVED
+  DISMISSED
+}

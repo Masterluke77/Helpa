@@ -1,0 +1,77 @@
+version: '3.8'
+
+services:
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    restart: always
+    ports:
+      - "3000:3000"
+    environment:
+      - DATABASE_URL=postgresql://helpa:password@postgres:5432/helpa_db?schema=public
+      - NEXTAUTH_URL=http://localhost:3000
+      - NEXTAUTH_SECRET=changeme_in_prod
+      - NEXT_PUBLIC_SOCKET_URL=http://localhost:3001
+      - APP_BASE_URL=http://localhost:3000
+      - UPLOAD_S3_ENDPOINT=http://minio:9000
+      - UPLOAD_S3_ACCESS_KEY=minioadmin
+      - UPLOAD_S3_SECRET_KEY=minioadmin
+      - UPLOAD_S3_BUCKET=helpa-uploads
+      - UPLOAD_S3_PUBLIC_URL=http://localhost:9000
+      - REDIS_URL=redis://redis:6379
+      # Add GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET here or in Portainer env
+      # Add MAPBOX_TOKEN here or in Portainer env
+    depends_on:
+      - postgres
+      - redis
+      - minio
+
+  websocket-server:
+    build:
+      context: .
+      dockerfile: apps/websocket-server/Dockerfile
+    restart: always
+    ports:
+      - "3001:3001"
+    environment:
+      - PORT=3001
+    depends_on:
+      - redis
+
+  postgres:
+    image: postgis/postgis:15-3.3
+    restart: always
+    # Ports exposed only internal usually, but for easy access...
+    # ports:
+    #   - "5432:5432" 
+    environment:
+      POSTGRES_USER: helpa
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: helpa_db
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  minio:
+    image: minio/minio
+    restart: always
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    command: server /data --console-address ":9001"
+    volumes:
+      - minio_data:/data
+
+  redis:
+    image: redis:alpine
+    restart: always
+    volumes:
+      - redis_data:/data
+
+volumes:
+  postgres_data:
+  minio_data:
+  redis_data:
