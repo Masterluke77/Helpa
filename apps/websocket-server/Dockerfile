@@ -17,6 +17,7 @@ RUN npm install
 
 COPY --from=builder /app/out/full/ .
 COPY turbo.json turbo.json
+COPY tsconfig.json tsconfig.json
 
 RUN npx turbo run build --filter=websocket-server...
 
