@@ -19,7 +19,10 @@ COPY --from=builder /app/out/full/ .
 COPY turbo.json turbo.json
 COPY tsconfig.json tsconfig.json
 
-RUN npx turbo run build --filter=websocket-server...
+# Build directly to avoid turbo issues
+WORKDIR /app/apps/websocket-server
+RUN npm run build
+WORKDIR /app
 
 FROM base AS runner
 WORKDIR /app
