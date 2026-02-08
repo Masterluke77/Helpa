@@ -13,6 +13,7 @@ WORKDIR /app
 
 COPY --from=builder /app/out/json/ .
 COPY --from=builder /app/out/package-lock.json ./package-lock.json
+# Install ALL dependencies (including dev) for build
 RUN npm install
 
 COPY --from=builder /app/out/full/ .
